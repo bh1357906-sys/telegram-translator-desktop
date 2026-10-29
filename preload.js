@@ -52,13 +52,19 @@ function injectStyles() {
 function getMessageText(msgEl) {
   const src = msgEl.querySelector('.message [data-message-text-source]');
   if (src) {
-    const t = src.innerText.trim();
+    // 排除 reply 块（引用的预览），只取正文
+    const clone = src.cloneNode(true);
+    const replyEl = clone.querySelector('.reply, [class*="reply"], [class*="Reply"]');
+    if (replyEl) replyEl.remove();
+    const t = clone.innerText.trim();
     if (t) return t;
   }
-  // fallback：.message 的文本，去掉 .time 时间戳
+  // fallback：.message 的文本，去掉 reply 块 + .time 时间戳
   const msg = msgEl.querySelector('.message');
   if (!msg) return null;
   const clone = msg.cloneNode(true);
+  const replyEl = clone.querySelector('.reply, [class*="reply"], [class*="Reply"]');
+  if (replyEl) replyEl.remove();
   const timeEl = clone.querySelector('.time');
   if (timeEl) timeEl.remove();
   const t = clone.innerText.trim();

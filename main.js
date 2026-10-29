@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, clipboard, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -66,10 +66,49 @@ function openSettings() {
   win.loadFile('settings.html');
 }
 
+// 检查更新：查 GitHub 最新 release，有新版本弹窗 + 跳转下载
+const APP_VERSION = '0.1.3';
+const GITHUB_REPO = 'bh1357906-sys/telegram-translator-desktop';
+async function checkUpdate(silentOk) {
+  const win = BrowserWindow.getAllWindows()[0];
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'tg-translator' },
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const latest = (data.tag_name || '').replace(/^v/, '');
+    const cur = APP_VERSION.replace(/^v/, '');
+    if (latest && latest !== cur) {
+      const r = dialog.showMessageBoxSync(win, {
+        type: 'info',
+        title: '发现新版本',
+        message: `新版本 ${data.tag_name || latest} 可用（当前 ${APP_VERSION}）`,
+        detail: '点「下载」前往 GitHub 下载最新安装包。',
+        buttons: ['下载', '稍后'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+      if (r === 0) shell.openExternal(data.html_url || `https://github.com/${GITHUB_REPO}/releases`);
+      return true;
+    }
+    if (!silentOk) {
+      dialog.showMessageBoxSync(win, { type: 'info', title: '检查更新', message: '当前已是最新版本', buttons: ['好'] });
+    }
+    return false;
+  } catch (err) {
+    if (!silentOk) {
+      dialog.showMessageBoxSync(win, { type: 'warning', title: '检查更新', message: '检查失败：' + (err && err.message), buttons: ['好'] });
+    }
+    return false;
+  }
+}
+
 app.whenReady().then(() => {
   const menu = Menu.buildFromTemplate([
     ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
     { label: '设置…', accelerator: 'CmdOrCtrl+,', click: openSettings },
+    { label: '检查更新…', click: () => checkUpdate() },
     { role: 'editMenu' },
     { role: 'viewMenu' },
     { role: 'windowMenu' },
@@ -77,6 +116,8 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(menu);
 
   createMainWindow();
+  // 启动后 5 秒静默检查更新（只有发现新版本才弹窗）
+  setTimeout(() => checkUpdate(true), 5000);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });
