@@ -47,7 +47,7 @@ function createMainWindow() {
       nodeIntegration: false,
     },
   });
-  win.loadURL('https://web.telegram.org/', { userAgent: CHROME_UA });
+  win.loadURL('https://web.telegram.org/k/', { userAgent: CHROME_UA });
   return win;
 }
 
