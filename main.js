@@ -97,7 +97,7 @@ ipcMain.handle('replace-draft', async (e, { text }) => {
   clipboard.writeText(text);
   await win.webContents.executeJavaScript(`
     (function() {
-      const box = document.querySelector('footer div[contenteditable="true"]');
+      const box = document.querySelector('.input-message-input[contenteditable="true"]') || document.querySelector('[contenteditable="true"]');
       if (!box) return false;
       box.focus();
       const sel = window.getSelection();
