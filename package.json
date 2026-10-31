@@ -1,18 +1,18 @@
 {
   "name": "telegram-translator-desktop",
-  "version": "0.1.14",
-  "description": "Telegram Web desktop translator: auto-translate incoming messages to your language, and translate your drafts to the contact's language. Bring your own DeepSeek key.",
+  "version": "0.3.0",
+  "description": "Telegram Web desktop translator: auto-translate incoming messages to your language, and translate your drafts to the contact's language. Bring your own DeepSeek / OpenAI / Gemini key.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist:win": "electron-builder --win nsis --x64",
-    "dist:mac": "electron-builder --mac dmg --arm64"
+    "test": "node --test",
+    "dist": "electron-builder --win nsis --x64 --publish never"
   },
   "author": "bh1357906-sys",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.1.8"
+    "electron": "^44.0.0",
+    "electron-builder": "^26.0.0"
   },
   "build": {
     "appId": "com.shopbharat.tgtranslator",
@@ -20,6 +20,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "core/**/*",
       "settings.html",
       "settings.js",
       "settings-preload.js",
@@ -29,14 +30,21 @@
       "target": "nsis",
       "icon": "build/icon.ico"
     },
-    "mac": {
-      "target": "dmg",
-      "category": "public.app-category.utilities"
-    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
-    }
+      "createDesktopShortcut": true,
+      "artifactName": "tg-translator-setup-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "bh1357906-sys",
+        "repo": "telegram-translator-desktop"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.0"
   }
 }
