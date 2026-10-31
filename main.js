@@ -68,7 +68,7 @@ function openSettings() {
 }
 
 // 检查更新：查 GitHub 最新 release，有新版本弹窗 + 跳转下载
-const APP_VERSION = '0.1.8';
+const APP_VERSION = '0.1.9';
 const GITHUB_REPO = 'bh1357906-sys/telegram-translator-desktop';
 async function checkUpdate(silentOk) {
   const win = BrowserWindow.getAllWindows()[0];
@@ -138,9 +138,8 @@ ipcMain.handle('replace-draft', async (e, { text }) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   if (!win) return true;
   clipboard.writeText(text);
-  const t = String(text || '').trim();
   const boxSel = '.input-message-input[contenteditable="true"], [contenteditable="true"]';
-  const selectJs = `
+  await win.webContents.executeJavaScript(`
     (function() {
       const box = document.querySelector(${JSON.stringify(boxSel)});
       if (!box) return false;
@@ -152,22 +151,8 @@ ipcMain.handle('replace-draft', async (e, { text }) => {
       sel.addRange(range);
       return true;
     })()
-  `;
-  const readJs = `
-    (function() {
-      const box = document.querySelector(${JSON.stringify(boxSel)});
-      return box ? (box.innerText || '').trim() : '';
-    })()
-  `;
-  await win.webContents.executeJavaScript(selectJs);
+  `);
   win.webContents.paste();
-  await new Promise((r) => setTimeout(r, 150)); // 等 React 同步，避免误判
-  const cur = await win.webContents.executeJavaScript(readJs);
-  if (t && cur !== t) {
-    // 替换不干净，重试一次（全选 + 粘贴）
-    await win.webContents.executeJavaScript(selectJs);
-    win.webContents.paste();
-  }
   return true;
 });
 ipcMain.handle('press-enter', async (e) => {
