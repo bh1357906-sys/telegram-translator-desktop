@@ -48,6 +48,40 @@ function injectStyles() {
   (document.head || document.documentElement).appendChild(st);
 }
 
+// ---- 联系人识别 + 记住语言 ----
+let currentChat = null;
+
+function currentChatName() {
+  try {
+    const el = document.querySelector('.chat-info .peer-title, [class*="chat-info"] .peer-title, .top .user-title .peer-title');
+    if (el) {
+      const t = (el.innerText || '').trim();
+      if (t) return t;
+    }
+    return null;
+  } catch (_) { return null; }
+}
+
+async function applyContactLang(name) {
+  try {
+    const lang = await ipcRenderer.invoke('get-contact-lang', name);
+    if (lang) {
+      currentLangName = lang;
+      const opt = LANG_OPTIONS.find((l) => l.name === lang);
+      const b = document.getElementById('wa-lang-fab');
+      if (b && opt) { b.textContent = opt.code; b.title = '对方语言：' + opt.name + '（点开切换）'; }
+    }
+  } catch (_) {}
+}
+
+function maybeResetChat() {
+  const name = currentChatName();
+  if (name && name !== currentChat) {
+    currentChat = name;
+    applyContactLang(name); // 切换聊天时，应用该联系人上次用的语言
+  }
+}
+
 // Telegram Web K 版：消息文本在 .message 里的 [data-message-text-source]
 function getMessageText(msgEl) {
   const src = msgEl.querySelector('.message [data-message-text-source]');
@@ -85,6 +119,7 @@ function translateMessage(msgEl) {
   const text = getMessageText(msgEl);
   if (!text) return;
   const incoming = isIncoming(msgEl);
+  maybeResetChat(); // 检测聊天切换，切换时应用该联系人语言
   const hasTailIn = incoming; // Telegram 无 tail 概念，用方向近似
   msgEl.dataset.waTr = 'pending';
   const key = (msgEl.getAttribute('data-mid') || '') + '::' + text;
@@ -136,12 +171,6 @@ async function translateDraft() {
   try {
     const out = await ipcRenderer.invoke('translate', { text, direction: 'outgoing' });
     sentOriginals.set((out || '').trim(), text);
-    box.focus();
-    const sel = window.getSelection();
-    const r = document.createRange();
-    r.selectNodeContents(box);
-    sel.removeAllRanges();
-    sel.addRange(r);
     await ipcRenderer.invoke('replace-draft', { text: out });
   } catch (err) {
     alert(
@@ -206,7 +235,7 @@ function addLangFab() {
     item.addEventListener('mouseenter', () => { item.style.background = '#f0f2f5'; });
     item.addEventListener('mouseleave', () => { item.style.background = ''; });
     item.addEventListener('click', async () => {
-      await ipcRenderer.invoke('set-their-lang', l.name);
+      await ipcRenderer.invoke('set-their-lang', { lang: l.name, contact: currentChatName() || '' });
       currentLangName = l.name;
       b.textContent = l.code;
       b.title = '对方语言：' + l.name + '（点开切换）';
@@ -234,22 +263,22 @@ async function translateAndSend(box) {
     const text = (box.innerText || '').trim();
     if (!text) return;
     const out = await ipcRenderer.invoke('translate', { text, direction: 'outgoing' });
-    sentOriginals.set((out || '').trim(), text);
-    box.focus();
-    const sel = window.getSelection();
-    const r = document.createRange();
-    r.selectNodeContents(box);
-    sel.removeAllRanges();
-    sel.addRange(r);
-    await ipcRenderer.invoke('replace-draft', { text: out });
+    const clean = (out || '').trim();
+    // 兜底检查：译文为空或仍含中文（翻译异常），不发原文，保留草稿
+    if (!clean || hasChinese(clean)) {
+      alert('翻译结果异常（未得到目标语言），消息未发送，请重试');
+      return;
+    }
+    sentOriginals.set(clean, text);
+    await ipcRenderer.invoke('replace-draft', { text: clean });
     await ipcRenderer.invoke('press-enter');
   } catch (err) {
+    // 翻译失败：不发原文（避免中文直接发给外国客户），保留草稿让用户重试
     alert(
       err && String(err.message).includes('NO_KEY')
         ? '未配置 DeepSeek Key，请点 ⚙ 设置'
-        : '翻译失败：' + (err && err.message ? String(err.message) : err)
+        : '翻译失败：' + (err && err.message ? String(err.message) : err) + '\n\n（消息未发送，可重试）'
     );
-    try { await ipcRenderer.invoke('press-enter'); } catch (_) {}
   } finally {
     draftTranslating = false;
   }
@@ -300,7 +329,22 @@ function start() {
   addLangFab();
   scan();
   interceptSend();
-  new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  // MutationObserver 节流：DOM 高频变化时最多每 300ms 扫描一次，避免 CPU 飙升
+  let scanTimer = null;
+  const throttledScan = () => {
+    if (scanTimer) return;
+    scanTimer = setTimeout(() => { scanTimer = null; scan(); }, 300);
+  };
+  new MutationObserver(throttledScan).observe(document.body, { childList: true, subtree: true });
+  // 语言选择持久化：启动时从设置读回
+  ipcRenderer.invoke('get-settings').then((s) => {
+    if (s && s.theirLang) {
+      currentLangName = s.theirLang;
+      const opt = LANG_OPTIONS.find((l) => l.name === s.theirLang);
+      const b = document.getElementById('wa-lang-fab');
+      if (b && opt) { b.textContent = opt.code; b.title = '对方语言：' + opt.name + '（点开切换）'; }
+    }
+  }).catch(() => {});
 }
 
 document.addEventListener('keydown', (e) => {
