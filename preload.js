@@ -8,8 +8,9 @@ const { boot, readRichText } = require('./core/renderer-core');
 const SKIP_SEL = '.reply, .time, .time-inner, .reactions, .message-sign, .webpage, .bubble-name-first, .name, .peer-title, .reply-markup, .tgico, .custom-emoji';
 
 const adapter = {
+  // 当前打开的聊天（Telegram 会同时保留多个消息容器，只看 .chat.active 里的）
   getMessageElements() {
-    const root = document.querySelector('.bubbles-inner') || document.querySelector('.bubbles') || document;
+    const root = document.querySelector('.chat.active') || document;
     return Array.from(root.querySelectorAll('.bubble[data-mid]')).filter(
       (el) => !el.classList.contains('service') && !el.classList.contains('is-date') && !el.classList.contains('sticker')
     );
@@ -27,17 +28,20 @@ const adapter = {
     return { id: peer + ':' + mid, text, incoming, mount: msg };
   },
 
-  // 翻译行放在时间戳前面，避免和右下角的时间重叠
+  // 翻译行放在正文后面、时间戳 / 表情回应之前
   placeLine(info, line) {
-    const time = info.mount.querySelector(':scope > .time');
-    if (time) info.mount.insertBefore(line, time);
+    const anchor = info.mount.querySelector(':scope > .clearfix, :scope > reactions-element, :scope > .reactions, :scope > .time');
+    if (anchor) info.mount.insertBefore(line, anchor);
     else info.mount.appendChild(line);
   },
 
   getChat() {
     // URL hash 是聊天的唯一标识，如 #777000 / #@username / #-100123
     const hash = (location.hash || '').replace(/^#/, '');
-    const t = document.querySelector('.chat-info .peer-title, .sidebar-header .chat-info .peer-title, .top .peer-title');
+    const t =
+      document.querySelector('.chat.active .top .peer-title') ||
+      document.querySelector('.chat.active .chat-info .peer-title') ||
+      document.querySelector('.chat-info .peer-title, .top .peer-title');
     const name = t ? (t.textContent || '').trim() : '';
     if (!hash && !name) return null;
     const aliases = hash && name ? [name] : [];
@@ -45,7 +49,7 @@ const adapter = {
   },
 
   getComposer() {
-    const list = document.querySelectorAll('.chat-input .input-message-input[contenteditable="true"]');
+    const list = document.querySelectorAll('.chat.active .chat-input .input-message-input[contenteditable="true"], .chat-input .input-message-input[contenteditable="true"]');
     for (const el of list) if (!el.classList.contains('input-field-input-fake') && el.offsetParent !== null) return el;
     return list[0] || null;
   },
