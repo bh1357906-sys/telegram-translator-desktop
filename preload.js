@@ -5,7 +5,7 @@
 const { boot, readRichText } = require('./core/renderer-core');
 
 // 不属于正文的部分：引用、时间、回复按钮、反应、链接预览、署名等
-const SKIP_SEL = '.reply, .time, .time-inner, .reactions, .message-sign, .webpage, .bubble-name-first, .name, .peer-title, .reply-markup, .tgico, .custom-emoji';
+const SKIP_SEL = 'audio-element, .audio, .reply, .time, .time-inner, .reactions, .message-sign, .webpage, .bubble-name-first, .name, .peer-title, .reply-markup, .tgico, .custom-emoji';
 
 const adapter = {
   // 当前打开的聊天（Telegram 会同时保留多个消息容器，只看 .chat.active 里的）
@@ -33,6 +33,19 @@ const adapter = {
     const anchor = info.mount.querySelector(':scope > .clearfix, :scope > reactions-element, :scope > .reactions, :scope > .time');
     if (anchor) info.mount.insertBefore(line, anchor);
     else info.mount.appendChild(line);
+  },
+
+  // 语音消息：audio-element 里的播放键
+  getVoiceInfo(el) {
+    const ae = el.querySelector('audio-element, .audio');
+    if (!ae) return null;
+    const playBtn = ae.querySelector('.audio-toggle, .audio-play-icon, .audio-ico, button');
+    if (!playBtn) return null;
+    const msg = el.querySelector('.message') || el;
+    const mid = el.getAttribute('data-mid') || '';
+    if (!mid) return null;
+    const peer = el.getAttribute('data-peer-id') || (location.hash || '');
+    return { id: peer + ':' + mid, incoming: !el.classList.contains('is-out'), mount: msg, playBtn, voice: true };
   },
 
   getChat() {
