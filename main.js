@@ -2,6 +2,12 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
+
+if (!fs.existsSync(path.join(__dirname, 'dist-preload', 'preload.js'))) {
+  console.error('[translator] dist-preload/preload.js 不存在：请先运行 npm run build（npm start 会自动构建）');
+  process.exit(1);
+}
 const { createTranslatorApp } = require('./core/main-core');
 
 createTranslatorApp({
@@ -10,5 +16,7 @@ createTranslatorApp({
   url: 'https://web.telegram.org/k/',
   allowedHosts: ['web.telegram.org'],
   repo: 'bh1357906-sys/telegram-translator-desktop',
-  preload: path.join(__dirname, 'preload.js'),
+  // 聊天页面的 preload 用打包后的单文件（npm run build 生成），这样页面可以开沙箱
+  preload: path.join(__dirname, 'dist-preload', 'preload.js'),
+  icon: path.join(__dirname, 'build', 'icon.png'),
 });

@@ -48,6 +48,24 @@ const adapter = {
     return { id: peer + ':' + mid, incoming: !el.classList.contains('is-out'), mount: msg, playBtn, voice: true };
   },
 
+  // 图片消息：.attachment / .media-container 里的图；头像、表情、链接预览小图不算
+  getImageInfo(el) {
+    const imgs = Array.from(el.querySelectorAll('.attachment img, .media-container img, img.media-photo, .document-thumb img')).filter((img) => {
+      if (img.closest('.wa-tr-line, .avatar, .reply, .webpage, .reactions, .custom-emoji, .sticker')) return false;
+      const src = img.currentSrc || img.src || '';
+      if (!/^(blob:|data:image|https:)/.test(src)) return false;
+      const r = img.getBoundingClientRect();
+      return r.width >= 80 && r.height >= 60;
+    });
+    if (!imgs.length) return null;
+    const img = imgs[0];
+    const mid = el.getAttribute('data-mid') || '';
+    if (!mid) return null;
+    const peer = el.getAttribute('data-peer-id') || (location.hash || '');
+    const msg = el.querySelector('.message') || el;
+    return { id: 'img:' + peer + ':' + mid, incoming: !el.classList.contains('is-out'), mount: msg, img };
+  },
+
   getChat() {
     // URL hash 是聊天的唯一标识，如 #777000 / #@username / #-100123
     const hash = (location.hash || '').replace(/^#/, '');
