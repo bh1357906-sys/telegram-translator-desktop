@@ -96,6 +96,27 @@ const adapter = {
 
   sendButtonSelector: '.btn-send:not(.record)',
 
+  // 发语音条：Telegram 的录音键是 .btn-send.record，录音中输入区带 is-recording
+  voiceSend: {
+    input: () => document.querySelector('.chat.active .chat-input') || document.querySelector('.chat-input'),
+    micButton() {
+      const ci = this.input();
+      return ci ? ci.querySelector('.btn-send.record') : null;
+    },
+    isRecording() {
+      const ci = this.input();
+      return !!ci && ci.classList.contains('is-recording');
+    },
+    cancelButton() {
+      const ci = this.input();
+      return ci ? ci.querySelector('.voice-recording-cancel') : null;
+    },
+    sendButton() {
+      const ci = this.input();
+      return ci ? ci.querySelector('.btn-send.send') || ci.querySelector('.btn-send:not(.record)') : null;
+    },
+  },
+
   composerForButton(btn) {
     const popup = btn.closest('.popup');
     if (popup) {
