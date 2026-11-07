@@ -101,8 +101,14 @@ const adapter = {
     input: () => document.querySelector('.chat.active .chat-input') || document.querySelector('.chat-input'),
     micButton() {
       const ci = this.input();
-      return ci ? ci.querySelector('.btn-send.record') : null;
+      if (!ci) return null;
+      const b = ci.querySelector('.btn-send.record');
+      if (b) return b;
+      // 录音键被切成了“视频圈”模式（右键录音键可以切回语音）
+      if (ci.querySelector('.btn-send.record-video')) throw new Error('Telegram 的录音键现在是「视频」模式，请右键它切换回「语音」再试');
+      return null;
     },
+    errorToast: '.toast',
     isRecording() {
       const ci = this.input();
       return !!ci && ci.classList.contains('is-recording');
