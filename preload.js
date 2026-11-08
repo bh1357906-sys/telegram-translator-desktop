@@ -123,6 +123,10 @@ const adapter = {
     },
   },
 
+  sendArea(el) {
+    return el && el.closest ? el.closest('.chat-input, .popup') : null;
+  },
+
   composerForButton(btn) {
     const popup = btn.closest('.popup');
     if (popup) {
