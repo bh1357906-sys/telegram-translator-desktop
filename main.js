@@ -15,6 +15,8 @@ createTranslatorApp({
   shortName: 'tg-translator',
   url: 'https://web.telegram.org/k/',
   allowedHosts: ['web.telegram.org'],
+  // 只支持 K 版网页；有人在 Telegram 菜单里点“切换到 A 版”也留在 K 版（A 版上翻译和护栏都不工作）
+  pathPrefix: '/k',
   repo: 'bh1357906-sys/telegram-translator-desktop',
   // 聊天页面的 preload 用打包后的单文件（npm run build 生成），这样页面可以开沙箱
   preload: path.join(__dirname, 'dist-preload', 'preload.js'),

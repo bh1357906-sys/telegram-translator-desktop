@@ -4,6 +4,20 @@
 
 const { boot, readRichText } = require('./core/renderer-core');
 
+// 只支持 K 版网页（/k/）。有人在 Telegram 菜单里点了“切换到 A 版”之后，翻译和护栏都不认识那个页面——直接切回 K 版
+if (location.host === 'web.telegram.org' && !/^\/k(\/|$)/.test(location.pathname)) {
+  try {
+    location.replace('https://web.telegram.org/k/');
+  } catch (_) {}
+}
+
+const COMPOSER_SEL = '.input-message-input[contenteditable="true"]:not(.input-field-input-fake)';
+// 当前打开着的弹窗（发图片 / 文件、转发附言…），最上面的那个
+function topPopup() {
+  const pops = Array.from(document.querySelectorAll('.popup')).filter((p) => p.getClientRects().length > 0);
+  return pops.length ? pops[pops.length - 1] : null;
+}
+
 // 不属于正文的部分：引用、时间、回复按钮、反应、链接预览、署名等
 const SKIP_SEL = 'audio-element, .audio, .reply, .time, .time-inner, .reactions, .message-sign, .webpage, .bubble-name-first, .name, .peer-title, .reply-markup, .tgico, .custom-emoji';
 
@@ -25,7 +39,10 @@ const adapter = {
     const incoming = el.classList.contains('is-out') ? false : true;
     const mid = el.getAttribute('data-mid') || '';
     const peer = el.getAttribute('data-peer-id') || (location.hash || '');
-    return { id: peer + ':' + mid, text, incoming, mount: msg };
+    const tEl = el.querySelector('.time .time-inner') || el.querySelector('.time');
+    const time = tEl ? (tEl.getAttribute('title') || tEl.textContent || '').trim() : ''; // 漏发检测用：只对“刚刚发出的”消息报警
+    const ts = Number(el.getAttribute('data-timestamp')) || 0; // Telegram 把消息的发送时间（秒）写在气泡上
+    return { id: peer + ':' + mid, text, incoming, sure: true, time, ts, mount: msg };
   },
 
   // 翻译行放在正文后面、时间戳 / 表情回应之前
@@ -94,7 +111,36 @@ const adapter = {
     return el;
   },
 
-  sendButtonSelector: '.btn-send:not(.record)',
+  // 屏幕上“回车 / 确认键会发出去”的输入框：有弹窗时是弹窗里的配文框（此时聊天输入框不会被发送），否则是聊天输入框
+  listComposers() {
+    const pop = topPopup();
+    if (pop) return Array.from(pop.querySelectorAll(COMPOSER_SEL));
+    const main = adapter.getComposer();
+    return main ? [main] : [];
+  },
+
+  // 聊天输入区 / 发图片弹窗里，一个我们不认识的输入框（改版把类名换了？）：护栏按“可能是聊天输入框”处理
+  maybeComposer(el) {
+    return !!(el && el.closest && el.closest('.chat-input, .popup-new-media, .popup-send-photo'));
+  },
+
+  // Telegram 网页版：焦点不在任何输入框里时按回车，也会把输入框里的草稿发出去（源码 appImManager → passEventToInput）
+  enterOutsideSends: true,
+
+  // 发送键：聊天输入区的（发送 / 编辑✓ / 定时 / 转发；录音键、视频键、停止键不算），和弹窗里的确认键（弹窗里有配文框才算）
+  sendButtonFrom(target) {
+    if (!target || !target.closest) return null;
+    const b = target.closest('.btn-send');
+    if (b) return /(^|\s)(record|record-video|stop)(\s|$)/.test(b.className) ? null : b;
+    const pop = target.closest('.popup');
+    if (pop && pop.querySelector(COMPOSER_SEL)) return target.closest('button.btn-primary, .simple-message-input-confirm');
+    return null;
+  },
+
+  // 右键发送键弹出的菜单（不带提示音发送 / 定时发送 / 对方上线时发送）：菜单挂在页面最外层，不在输入区里
+  sendMenuItemFrom(target) {
+    return target && target.closest ? target.closest('.menu-send .btn-menu-item, .menu-send [role="menuitem"]') : null;
+  },
 
   // 发语音条：Telegram 的录音键是 .btn-send.record，录音中输入区带 is-recording
   voiceSend: {
@@ -129,15 +175,14 @@ const adapter = {
 
   composerForButton(btn) {
     const popup = btn.closest('.popup');
-    if (popup) {
-      const c = popup.querySelector('.input-message-input[contenteditable="true"]:not(.input-field-input-fake)');
-      if (c) return c;
-    }
+    if (popup) return popup.querySelector(COMPOSER_SEL); // 弹窗里没有配文框 → null：这个按钮发的不是输入框里的字
     return adapter.getComposer();
   },
 
   findSendButton(box) {
-    const scope = (box && (box.closest('.popup') || box.closest('.chat-input'))) || document;
+    const popup = box && box.closest('.popup');
+    if (popup) return popup.querySelector('.simple-message-input-confirm, button.btn-primary');
+    const scope = (box && box.closest('.chat-input')) || document;
     return scope.querySelector('.btn-send');
   },
 };
