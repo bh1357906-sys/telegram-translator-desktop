@@ -63,6 +63,7 @@ core/                 通用逻辑（WA / TG 两个项目完全相同，改一�
   main-core.js        Electron 主进程：窗口、菜单、托盘、通知、更新、API 请求代理、输入框写入
   accounts.js         多账号：独立登录数据、独立代理、出口 IP 检测
   files.js            下载文件：文件名清理、同名不覆盖、哪些类型自动打开
+  safe-log.js         诊断日志的脱敏：网址只留域名，网页自己打印的内容不记
   voice-hook.js       语音消息抓取（注入网页主环境，播放时读出本地音频）
   i18n.js             界面语言（中文 / English 词典）
   proxy.js            代理链接解析、代理规则
