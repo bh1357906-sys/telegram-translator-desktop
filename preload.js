@@ -22,6 +22,15 @@ function topPopup() {
 const SKIP_SEL = 'audio-element, .audio, .reply, .time, .time-inner, .reactions, .message-sign, .webpage, .bubble-name-first, .name, .peer-title, .reply-markup, .tgico, .custom-emoji';
 
 const adapter = {
+  // 页面现在停在哪：'chat' = 已登录（聊天界面在）；'login' = 停在登录界面（手机号 / 二维码 / 验证码 / 密码）；'' = 说不准
+  // 只用来在账号栏上提醒“这个账号没登录”，认不出来就不提醒，不影响别的功能
+  pageState() {
+    const shown = (el) => !!el && el.getClientRects().length > 0;
+    if (shown(document.getElementById('page-chats')) || shown(document.querySelector('#column-left, .chatlist-container, .chat.active'))) return 'chat';
+    if (shown(document.querySelector('#auth-pages, .page-sign, .page-signQR, .page-authCode, .page-password, .page-signUp'))) return 'login';
+    return '';
+  },
+
   // 当前打开的聊天（Telegram 会同时保留多个消息容器，只看 .chat.active 里的）
   getMessageElements() {
     const root = document.querySelector('.chat.active') || document;
